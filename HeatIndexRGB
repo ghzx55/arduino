@@ -1,0 +1,181 @@
+[code]
+
+/*전처리 구간: 컴파일 이전에 미리 처리되는 문장, 소스 프로그램을 
+ 변경하기 쉽고 컴파일을 용이하게 만듬
+ */
+int dust_sensor = A0;
+int rgb_red = 5;
+int rgb_green = 6;
+int rgb_blue = 7;
+
+float dust_value = 0;
+float dustDensityug = 0;
+
+int sensor_led = 12;
+int sampling = 280;
+int waiting = 40;
+float stop_time = 9680;
+//여기까지 미세먼지 전처리 구간
+
+//여기부터 온습도센서를 위한 전처리 구간
+#include <DHT.h>
+#define DHTPIN 2 //DHT11이 연결된 핀
+#define DHTTYPE DHT11
+// DHT 11, DHT시리즈중 11을 선택합니다.
+
+DHT dht(DHTPIN, DHTTYPE);
+
+int R = 8;
+int G = 9;
+int B = 10;
+//여기까지 온습도 센서를 위한 전처리 구간이었다.
+
+void setup() {
+
+Serial.begin(9600);
+pinMode(sensor_led,OUTPUT);
+pinMode(4, OUTPUT);
+
+pinMode(rgb_red, OUTPUT);
+pinMode(rgb_green, OUTPUT);
+pinMode(rgb_blue, OUTPUT);
+
+/*초기화 구간(setup 구간) 처음 시작할 떄 딱 한번만
+  실행되는 부분, 데이터를 초기화 설정할 떄 사용
+*/
+/*함수 pinMode(pin, mode) 디폴트 값: INPUT: 디지털 신호 입력모드로 설정
+ * 한다.// INPUT PULLUP:회로없이 풀업저항을 사용한다.
+ * OUTPUT: 디지털 신호 출력모드로 설정한다.
+ */
+ /* digitalWrite(pin, mode) 설정 핀에 디지털 신호를 출력하기 위함 함수
+  *  값은 0과 1 둘 중 하나이다.
+  *  HIGH: 5V를 출력
+  *  LOW: 0V를 출력
+  */
+  //여기까지 미세먼지 센서를 위한 setup이었음.
+
+  //여기부터 온습도 센서를 위한 setup
+    dht.begin();
+
+  pinMode(R,OUTPUT);
+  pinMode(G,OUTPUT);
+  pinMode(B,OUTPUT);
+//여기까지 온습도 센서를 위한 setup 끝
+  
+
+
+}
+
+void loop() {
+
+/*반복 구간(loop 구간) 아두이노의 실질적인 동작을 제어하는 코드,
+ * 전원이 있는 동안 계속 실행되는 부분, 코드적으로 멈추거나 전원을 끄지
+ * 않는 이상 계속 실행
+ */
+digitalWrite(sensor_led, LOW);
+delayMicroseconds(sampling);
+
+dust_value = analogRead(dust_sensor);
+
+delayMicroseconds(waiting);
+
+digitalWrite(sensor_led, HIGH);
+
+digitalWrite(sensor_led, HIGH);
+delayMicroseconds(stop_time);
+
+dustDensityug = (0.17 * (dust_value * (5.0 / 1024)) - 0.1) * 1000 + 40;
+Serial.print("Dust Density [ug/m3]: ");
+Serial.print(dustDensityug);
+
+if(dustDensityug <= 30.0){
+  analogWrite(rgb_red, 0);
+  analogWrite(rgb_green, 0);
+  analogWrite(rgb_blue, 255);
+  Serial.print("    ");
+  Serial.println("blue");
+}else if(30.0 < dustDensityug && dustDensityug <= 80.0){
+  analogWrite(rgb_red, 0);
+  analogWrite(rgb_green, 255);
+  analogWrite(rgb_blue, 0);
+  Serial.print("    ");
+  Serial.println("green");
+}else if (80.0 < dustDensityug && dustDensityug <= 150.0){
+  analogWrite(rgb_red, 255);
+  analogWrite(rgb_green, 0);
+  analogWrite(rgb_blue, 0);
+  Serial.print("    ");
+  Serial.println("yellow==>red");
+}else{
+  analogWrite(rgb_red, 255);
+  analogWrite(rgb_green, 0);
+  analogWrite(rgb_blue, 0);
+  Serial.print("    ");
+  Serial.println("red");
+}
+
+
+delay(1000);
+//여기까지 미세먼지 센서를 위한 loop구간이었음
+
+
+//여기부터 온습도센서를 위한 loop구간 시작.
+ float h = dht.readHumidity();
+  // 습도를 측정합니다.
+  float t = dht.readTemperature();
+  // 온도를 측정합니다.
+  float f = dht.readTemperature(true);
+  // 화씨 온도를 측정합니다.
+
+  float hif2 = dht.computeHeatIndex(f, h);
+  // 열지수를 계산합니다.
+  float hif = hif2-55;
+
+  Serial.print("Humidity: ");
+  Serial.print(h-25);
+  Serial.print(" %\t");
+  Serial.print("Temperature: ");
+  Serial.print(t);
+  Serial.print(" *C ");
+  Serial.print(f);
+  Serial.print(" *F\t");
+  Serial.print("Heat index: ");
+  Serial.print(hif);
+  Serial.println(" *F");
+
+
+  if(hif>54.00){
+    digitalWrite(R,HIGH);
+    digitalWrite(G,LOW);
+    digitalWrite(B,LOW);
+    }
+  // 열지수가 위험 수준이므로 적색 점등
+  else if(hif>41.00){
+    digitalWrite(R,HIGH);
+    digitalWrite(G,HIGH);
+    digitalWrite(B,LOW);
+    }
+  // 열지수가 높음 수준이므로 황색 점등
+  else{
+    digitalWrite(R,LOW);
+    digitalWrite(G,LOW);
+    digitalWrite(B,HIGH);
+    }
+  // 열지수가 보통 수준이므로 청색 점등
+
+    /*기상청 열지수 단계별 대응
+     * 열지수(Heat Index)>=54
+     * 위험, 매우높음
+     * 열지수>=41
+     * 높음
+     * 열지수>=32
+     * 보통
+     * 32미만
+     * 낮음
+     */
+     delay(1000);
+     //여기까지 온습도 센서를 위한 loop구간 이었음.
+
+
+}
+[/code]
